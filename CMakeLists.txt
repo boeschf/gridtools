@@ -47,6 +47,8 @@ FetchContent_Declare(
 set(CPP_BINDGEN_GT_LEGACY ON)
 FetchContent_MakeAvailable(cpp_bindgen)
 
+find_package(Boost COMPONENTS mpi REQUIRED)
+
 add_subdirectory(src)
 
 # ===============

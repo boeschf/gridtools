@@ -23,6 +23,10 @@
 #include "../communication/GCL.hpp"
 #include "../communication/halo_exchange.hpp"
 #include "../communication/low_level/proc_grids_3D.hpp"
+
+#include "/home/boeschf/Development/GHEX_fork/include/communication_object_2.hpp"
+#include "/home/boeschf/Development/GHEX_fork/include/gt_glue/gt_glue.hpp"
+
 #else
 #include "./mock_pattern.hpp"
 #endif
@@ -97,6 +101,20 @@ namespace gridtools {
         performance_meter_t m_meter_exchange;
         performance_meter_t m_meter_bc;
 
+
+        using protocol_t = protocol::mpi;
+        using grid_t     = gt_grid<protocol_t>;
+
+        grid_t m_grid;
+        
+        using pattern_x  = decltype(make_gt_pattern(m_grid,std::array<int,6>{0,0,0,0,0,0}));
+        
+        pattern_x m_pattern;
+
+        using co_t      = decltype(make_communication_object(m_pattern));
+
+        co_t m_co;
+
       public:
         /**
             @brief Constructor of distributed_boundaries.
@@ -113,7 +131,24 @@ namespace gridtools {
             array<halo_descriptor, 3> halos, boollist<3> period, uint_t max_stores, MPI_Comm CartComm)
             : m_halos{halos}, m_sizes{0, 0, 0}, m_max_stores{max_stores}, m_he(period, CartComm),
               m_meter_pack("pack/unpack       "), m_meter_exchange("exchange          "),
-              m_meter_bc("boundary condition") {
+              m_meter_bc("boundary condition") 
+              , m_grid{ 
+                    make_gt_processor_grid(
+                        array<int, 3>{ 
+                            (int)(halos[0].end()-halos[0].begin())+1,
+                            (int)(halos[1].end()-halos[1].begin())+1,
+                            (int)(halos[2].end()-halos[2].begin())+1},
+                        period.value(), 
+                        CartComm) }
+              , m_pattern{ 
+                    make_gt_pattern(
+                        m_grid,
+                        std::array<int,6>{
+                            (int)halos[0].minus(),(int)halos[0].plus(),
+                            (int)halos[1].minus(),(int)halos[1].plus(),
+                            (int)halos[2].minus(),(int)halos[2].plus()})}
+              , m_co { make_communication_object(m_pattern) }
+              {
 
             m_he.pattern().proc_grid().fill_dims(m_sizes);
 
@@ -173,7 +208,7 @@ namespace gridtools {
             call_pack(all_stores_for_exc, std::make_integer_sequence<uint_t, sizeof...(jobs)>{});
             m_meter_pack.pause();
             m_meter_exchange.start();
-            m_he.exchange();
+            //m_he.exchange();
             m_meter_exchange.pause();
             m_meter_pack.start();
             call_unpack(all_stores_for_exc, std::make_integer_sequence<uint_t, sizeof...(jobs)>{});
@@ -238,9 +273,13 @@ namespace gridtools {
 
         template <typename Stores, uint_t... Ids>
         void call_pack(Stores const &stores, std::integer_sequence<uint_t, Ids...>) {
-            m_he.pack(advanced::get_raw_pointer_of(_impl::proper_view<typename CTraits::compute_arch,
+            /*m_he.pack(advanced::get_raw_pointer_of(_impl::proper_view<typename CTraits::compute_arch,
                 access_mode::read_write,
-                std::decay_t<std::tuple_element_t<Ids, Stores>>>::make(std::get<Ids>(stores)))...);
+                std::decay_t<std::tuple_element_t<Ids, Stores>>>::make(std::get<Ids>(stores)))...);*/
+            std::tuple< typename std::remove_reference<decltype( wrap_gt_field(m_grid, std::get<Ids>(stores)) )>::type...> x {
+                wrap_gt_field(m_grid, std::get<Ids>(stores))... };
+            auto h = m_co.exchange(m_pattern(std::get<Ids>(x))...);
+            h.wait();
         }
 
         template <typename Stores, uint_t... Ids>
@@ -248,9 +287,9 @@ namespace gridtools {
 
         template <typename Stores, uint_t... Ids>
         void call_unpack(Stores const &stores, std::integer_sequence<uint_t, Ids...>) {
-            m_he.unpack(advanced::get_raw_pointer_of(_impl::proper_view<typename CTraits::compute_arch,
+            /*m_he.unpack(advanced::get_raw_pointer_of(_impl::proper_view<typename CTraits::compute_arch,
                 access_mode::read_write,
-                std::decay_t<std::tuple_element_t<Ids, Stores>>>::make(std::get<Ids>(stores)))...);
+                std::decay_t<std::tuple_element_t<Ids, Stores>>>::make(std::get<Ids>(stores)))...);*/
         }
 
         template <typename Stores, uint_t... Ids>

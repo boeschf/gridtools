@@ -9,7 +9,7 @@ if( GT_USE_MPI )
             NPROC 4
             SOURCES test_distributed_boundaries.cpp
             LABELS mpitest_x86)
-        target_link_libraries(test_distributed_boundaries_x86 gcl)
+        target_link_libraries(test_distributed_boundaries_x86 gcl Boost::mpi)
     endif()
 
     if( GT_ENABLE_BACKEND_CUDA )
@@ -19,7 +19,7 @@ if( GT_USE_MPI )
             NPROC 4
             SOURCES test_distributed_boundaries.cu
             LABELS mpitest_cuda)
-        target_link_libraries(test_distributed_boundaries_cuda gcl)
+        target_link_libraries(test_distributed_boundaries_cuda gcl Boost::mpi)
     endif()
 
 else()
@@ -31,7 +31,7 @@ else()
             SOURCES test_distributed_boundaries.cpp
             LABELS mpitest_x86
             )
-        target_link_libraries(test_distributed_boundaries_x86 gcl)
+        target_link_libraries(test_distributed_boundaries_x86 gcl Boost::mpi)
     endif()
 
     if( GT_ENABLE_BACKEND_CUDA )
@@ -41,7 +41,7 @@ else()
             SOURCES test_distributed_boundaries.cu
             LABELS mpitest_cuda
             )
-        target_link_libraries(test_distributed_boundaries_cuda gcl)
+        target_link_libraries(test_distributed_boundaries_cuda gcl Boost::mpi)
     endif()
 
 endif()
